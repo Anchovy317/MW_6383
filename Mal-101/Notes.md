@@ -121,3 +121,103 @@ Endian in memory which makes it kinda reserved or uspside down.
 Exaplanation of the code in the ./Coding-time/Process_injection.md.
 
 ## Dll INjector:
+What is the DLL [Dynamic Link Library]: Is a file format used in windows operating systems that contains reausable code.
+
+- How work the DLL injection:
+1. Identify and Attack  to a Target Process
+2. Allocate Memory
+3. Write the DLL path
+4. Create a Remote thread
+
+- 4 callbacks to abuse in the DLL injection
+
+In DLL Development, the [Dllmain] funtion acts as the main  entry point, like main funtion in stantard C program.
+    1. DLL_PROCESS_ATTACH: This the the most and common callbacks, triggered when the DLL is first loaded into a process memory.
+    This happends when a program needs the DLL starts, or when a running process explicity loads it. Where DLL typically perform
+    its initial setup, like allocating memory or creating threads.
+    2. DLL_PROCESS_DETACH: This is the Opposite if the DLL_PROCESS_ATTACH. Is unloaded form a process, this can happend when the process is about to terminate or wehen it
+    explicity frees the DLL. DLL should callback to perform any necesary cleanup. such relasing memory or closing memory file handle.
+    3. DLL_THREAD_ATTACH: This callback is triggered whenever a new thread is created inside a process that has already  loaded the DLL. This allows the DLL to perfom
+    thread-specific initialization.
+    4. DLL_THREAD_DETACH: This is called when thread is about exit cleanly. It gives the DLL an oportunity to clean up any resources it allocated the specifically memory for that
+    thread.
+[Link-DLLMAIN](https://learn.microsoft.com/es-es/windows/win32/dlls/dllmain) and the Notes [./Api-Windows.md].
+
+Local_dll.cpp
+
+```C++
+#include <iostream>
+#include <windows.h>
+#include <processthreadsapi.h>
+
+
+int main() {
+	// Name of the DLL to want loaded.
+	const char* dll_path = "my_library.dll";
+
+	//Flags to control the loads.
+
+	DWORD flags = LOAD_LIBRARY_AS_DATAFILE;
+
+	// Load the DLL
+
+	HMODULE hModule = LoadLibraryExA( dll_path, NULL, flags);
+	if (hModule != NULL) {
+		std::cout << "DLL '" << dll_path << "' SUSCESS LOAD." << std::endl;
+
+	// Free libreary
+		std::cout << "FREE DLL." << std::endl;
+
+	}
+	else {
+		// ERROR
+		DWORD error_code = GetLastError();
+		std::cerr << "Error to Load DLL. Code error: " << error_code << std::endl;
+
+	}
+	return 0;
+
+}
+```
+my_library.dll; for copiler to cpp --> dll use `g++ -shared -o my_library.dll my_library.cpp -DDLL_EXPORTS`
+```C++
+#include <windows.h>
+#include <iostream>
+
+#ifdef DLL_EXPORTS
+#define DLL_API __declspec(dllexport)
+#else
+#define DLL_API __declspec(dllimport)
+#endif
+
+// Export funtion
+
+extern "C" DLL_API void My_Funtion() {
+	MessageBox(NULL, "HEY to DLLS", "My Library", MB_OK);
+}
+
+// Dll Main
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+	switch (fdwReason)
+	{
+	case DLL_PROCESS_ATTACH:
+		// Load memory
+		std::cout << "SUSCESS LOAD DLL." << std::endl;
+		break;
+	case DLL_PROCESS_DETACH:
+		// Dowload the memory:
+		std::cout << "SUSCESS DOWNLOAD DLL." << std::endl;
+		break;
+	}
+	return TRUE;
+}
+```
+```powershell
+PS C:\Users\Anchovy\source\repos\FIrstmalware\LOADDLL> .\LoadLibrary.exe .\my_library.dll
+DLL 'my_library.dll' SUSCESS LOAD.
+FREE DLL
+
+```
+
+
+Look at the DLL_video code cuase the error is there. Search about malicius.dll how execute and all the stuff.
